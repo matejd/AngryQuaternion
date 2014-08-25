@@ -4,27 +4,44 @@
 #include <cmath>
 #include <type_traits>
 
+/// \brief Quaternions are an extension of real numbers
+/// used to represent rotations in 3D.
+///
+/// Quaternions are an alternative to Euler angles or rotation matrices (and others).
+/// They don't have singularities (Euler angles' gimbal lock), they are more compact
+/// than matrices (4 floats) and can be extended to represent translations as well (dual quaternions).
+/// As a set, the quaternions form \f$R^4\f$, four-dimensional vector space over the real
+/// numbers (meaning they possess the usual addition and scalar multiplication). In addition,
+/// quaternions can also be multiplied. Multiplication is associative, but (unlike
+/// multiplication of real or complex numbers) it is not commutative. There are
+/// many resources out there available covering quaternions much more extensively.
+/// This particular implementation is a very minimal one: a constructor taking
+/// 3D unit vector (axis of rotation) and rotation angle, addition and multiplication
+/// operators, methods converting to/from 3x3 matrices and a conjugate function (non-member).
+/// Example usage can be found in DualQuaternionTests.cpp file.
 class Quaternion
 {
 public:
     Quaternion() = default;
     Quaternion(float x, float y, float z, float w): x(x), y(y), z(z), w(w) {}
 
+    /// This constructor is enabled only when Q is not a float (assuming Q will then be
+    /// a different implementation of quaternions). Q must have public x,y,z,w members.
     template <typename Q,
               typename std::enable_if<not std::is_floating_point<Q>::value>::type* = nullptr>
     Quaternion(const Q& q): x(q.x), y(q.y), z(q.z), w(q.w) {}
-    /// This constructor is meant to simplify working with different implementations of quaternions.
 
-    template <typename F,
-              typename std::enable_if<std::is_floating_point<F>::value>::type* = nullptr>
-    Quaternion(F f): x(0.f), y(0.f), z(0.f), w(f) {}
+    /// Constructor enabled when F is a floating point. Constructs (0,0,0,f).
     /// Real numbers are a subset of quaternions (when x, y and z are zero).
-    /// Constructor above is enabled when F is a floating point.
     /// For example
     /// 2.f * Quaternion()
     /// is actually implemented as
-    /// Quaternion(2.f) * Quaternion()
+    /// Quaternion(2.f) * Quaternion().
+    template <typename F,
+              typename std::enable_if<std::is_floating_point<F>::value>::type* = nullptr>
+    Quaternion(F f): x(0.f), y(0.f), z(0.f), w(f) {}
 
+    /// Constructs a unit quaternion from the specified unit 3D vector and rotation angle.
     template <typename V3>
     Quaternion(const V3& unitAxis, float thetaRadians)
     {
@@ -37,27 +54,32 @@ public:
         w = ca;
     }
 
+    /// Constructs a unit quaternion representing no rotation (vector component is 0,
+    /// scalar is set to 1).
     static const Quaternion identity()
     {
         return Quaternion(0.f, 0.f, 0.f, 1.f);
     }
 
+    /// Returns the vector embedded in a quaternion.
+    /// Templatized to support various different implementations of 3D vectors.
+    /// Example usage: Quaternion::toVector<nv::vec3f>(q).
     template <typename V3>
     static const V3 toVector(const Quaternion& q)
     {
         return V3(q.x, q.y, q.z);
     }
 
+    /// Constructs a quaternion by embedding (identifying with) a 3D vector.
     template <typename V3>
     static const Quaternion fromVector(const V3& v)
     {
-        /// A pure quaternion can represent a 3D vector (_not_ translation).
-        /// It turns out that the product q * Quaternion::fromVector(v) * conjugate(q),
-        /// where q is unit quaternion, rotates
-        /// the vector v (in quaternion representation).
         return Quaternion(v.x, v.y, v.z, 0.f);
     }
 
+    /// Converts a quaternion to 3x3 rotation matrix. Assumes quaternion q
+    /// is unit (rotation only). Templatized on matrix type (requires
+    /// an operator() (row, column)).
     template <typename M3>
     static const M3 toMatrix(const Quaternion& q)
     {
@@ -66,7 +88,6 @@ public:
         const float z = q.z;
         const float w = q.w;
         M3 m;
-        // Assuming M3 has an operator() (row, column).
         m(0,0) = 1.f - 2.f*(y*y + z*z);
         m(0,1) = 2.f*(x*y - w*z);
         m(0,2) = 2.f*(x*z + w*y);
@@ -81,11 +102,12 @@ public:
         return m;
     }
 
+    /// Converts a pure rotation (orthogonal) 3x3 matrix to unit quaternion.
+    /// Templatized on matrix type (requires an operator() (row, column)).
+    /// For more information, see e.g. Real-Time Rendering (Haines, Hoffman, Akenine-Möller).
     template <typename M3>
     static const Quaternion fromMatrix(const M3& m)
     {
-        /// Assumes that matrix m represents pure rotation.
-        /// Converts to unit quaternion.
         Quaternion q;
         const float trace = m(0,0) + m(1,1) + m(2,2);
         if (trace > 0.f) {
@@ -116,9 +138,13 @@ public:
         return q;
     }
 
-    float x,y,z,w;
+    float x,y,z; ///< Vector part of the quaternion.
+
+    /// Scalar part of the quaternion.
+    float w;
 };
 
+/// Returns a Quaternion that is the sum of quaternions a and b (component-wise sum).
 inline const Quaternion operator + (const Quaternion& a, const Quaternion& b)
 {
     return Quaternion(a.x + b.x,
@@ -127,6 +153,7 @@ inline const Quaternion operator + (const Quaternion& a, const Quaternion& b)
                       a.w + b.w);
 }
 
+/// Quaternion multiplication.
 inline const Quaternion operator * (const Quaternion& a, const Quaternion& b)
 {
     return Quaternion(a.y*b.z - a.z*b.y + a.w*b.x + a.x*b.w,

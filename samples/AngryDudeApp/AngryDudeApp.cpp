@@ -1,3 +1,21 @@
+/// \file AngryDudeApp.hpp
+///
+/// \class AngryDudeApp
+/// \brief Main class of the sample.
+///
+/// \fn updateSkinning
+/// \memberof AngryDudeApp
+/// updateSkinning goes through the animated body's node hieararchy (nodes are usually
+/// bones, but some nodes do not have a corresponding bone, see Assimp's documentation
+/// for more info). For each node in the hierarchy, we compute the cumulative
+/// transform from the root node.
+/// updateSkinning is templatized (T being either nv::matrix4f or DualQuaternion)
+/// in order to avoid code duplication. The only difference between matrix and dual
+/// quaternion approaches (in this implementation) is in the mathematical object
+/// used to represent rigid body transformations. Since we store bone offsets
+/// with matrices, we have to convert those to dual quaternions (toT<T>())
+/// when skinning with dual quaternions.
+
 #include "AngryDudeApp.hpp"
 
 #include "NvUI/NvTweakBar.h"
@@ -184,16 +202,6 @@ nv::matrix4f identity()
     return nv::matrix4f();
 }
 
-// updateSkinning is templatized (T being either nv::matrix4f or DualQuaternion)
-// in order to avoid code duplication. The only difference between matrix and dual
-// quaternion approaches (in this implementation) is in the mathematical object
-// used to represent rigid body transformations. Since we store bone offsets
-// with matrices, we have to convert those to dual quaternions (toT<T>())
-// when skinning with dual quaternions.
-// updateSkinning goes through the animated body's node hieararchy (nodes are usually
-// bones, but some nodes do not have a corresponding bone, see Assimp's documentation
-// for more info). For each node in the hierarchy, we compute cumulative
-// transform from the root node.
 template <typename T>
 void AngryDudeApp::updateSkinning()
 {
